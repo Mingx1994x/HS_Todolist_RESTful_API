@@ -1,5 +1,4 @@
 const http = require('http');
-// const { title } = require('process');
 const { v4: uuidv4 } = require('uuid');
 
 const handleError = require('./handleError');
@@ -18,10 +17,10 @@ const getTodos = (res, headers) => {
 
 //create todos
 const createTodos = (res, headers, body) => {
-	let title = JSON.parse(body).title;
-	if (title) {
+	let content = JSON.parse(body).content;
+	if (content) {
 		let newTodo = {
-			title,
+			content,
 			id: uuidv4()
 		}
 		todos.push(newTodo);
@@ -62,9 +61,9 @@ const deleteTodoById = (res, headers, index) => {
 
 // update todo
 const updateTodoById = (res, headers, body, index) => {
-	let newTitle = JSON.parse(body).title;
-	if (newTitle) {
-		todos[index].title = newTitle;
+	let newTodo = JSON.parse(body).content;
+	if (newTodo) {
+		todos[index].content = newTodo;
 		res.writeHead(200, headers);
 		res.write(JSON.stringify({
 			status: 'update success',
@@ -92,7 +91,7 @@ const serverRequest = (req, res) => {
 	} else if (req.url === '/todos' && req.method === 'POST') {
 		req.on('end', () => {
 			try {
-				// console.log(JSON.parse(body).title);
+				// console.log(JSON.parse(body).content);
 				createTodos(res, headers, body);
 			} catch (error) {
 				let errMessage = '資料有誤，請洽客服人員';
