@@ -1,80 +1,9 @@
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 
-const handleError = require('./handleError');
+const { handleResponse, handleError } = require('./utils/handleResponse');
 
 const todos = [];
-
-//read todos
-const getTodos = (res, headers) => {
-	res.writeHead(200, headers);
-	res.write(JSON.stringify({
-		status: 'success',
-		data: todos
-	}));
-	res.end()
-}
-
-//create todos
-const createTodos = (res, headers, body) => {
-	let content = JSON.parse(body).content;
-	if (content) {
-		let newTodo = {
-			content,
-			id: uuidv4()
-		}
-		todos.push(newTodo);
-
-		res.writeHead(200, headers);
-		res.write(JSON.stringify({
-			status: 'success',
-			data: todos
-		}));
-		res.end()
-	} else {
-		let errMessage = '欄位未填寫正確';
-		handleError(res, headers, errMessage);
-	}
-}
-
-//delete todos
-const deleteTodos = (res, headers) => {
-	res.writeHead(200, headers);
-	todos.length = 0;
-	res.write(JSON.stringify({
-		status: 'success',
-		data: todos
-	}));
-	res.end()
-}
-
-//delete single todo
-const deleteTodoById = (res, headers, index) => {
-	res.writeHead(200, headers);
-	todos.splice(index, 1);
-	res.write(JSON.stringify({
-		status: 'success',
-		data: todos
-	}));
-	res.end();
-}
-
-// update todo
-const updateTodoById = (res, headers, body, index) => {
-	let newTodo = JSON.parse(body).content;
-	if (newTodo) {
-		todos[index].content = newTodo;
-		res.writeHead(200, headers);
-		res.write(JSON.stringify({
-			status: 'update success',
-			data: todos
-		}));
-		res.end()
-	} else {
-		let errMessage = '欄位未填寫正確';
-		handleError(res, headers, errMessage);
-	}
-}
 
 const serverRequest = (req, res) => {
 	const headers = {
@@ -87,52 +16,74 @@ const serverRequest = (req, res) => {
 	req.on('data', chunk => body += chunk);
 
 	if (req.url === '/todos' && req.method === 'GET') {
-		getTodos(res, headers);
+		// get todos
+		handleResponse(res, headers, todos)
 	} else if (req.url === '/todos' && req.method === 'POST') {
+		// create todo
 		req.on('end', () => {
 			try {
-				// console.log(JSON.parse(body).content);
-				createTodos(res, headers, body);
-			} catch (error) {
-				let errMessage = '資料有誤，請洽客服人員';
-				handleError(res, headers, errMessage);
-			}
-		})
-	} else if (req.url === '/todos' && req.method === 'DELETE') {
-		deleteTodos(res, headers);
-	} else if (req.url.startsWith('/todos/') && req.method === 'DELETE') {
-		let deleteItem = req.url.split('/').pop();
-		let deleteIndex = todos.findIndex(todo => todo.id === deleteItem);
-		// console.log(deleteIndex);
-		if (deleteIndex === -1) {
-			let errMessage = '查無此id';
-			handleError(res, headers, errMessage);
-		} else {
-			deleteTodoById(res, headers, deleteIndex);
-		}
-	} else if (req.url.startsWith('/todos/') && req.method === 'PATCH') {
-		req.on('end', () => {
-			try {
-				let updateItem = req.url.split('/').pop();
-				// console.log(JSON.stringify(body), updateItem);
-				let updateIndex = todos.findIndex(todo => todo.id === updateItem);
-				if (updateIndex === -1) {
-					let errMessage = '查無此id';
-					handleError(res, headers, errMessage);
+				const content = JSON.parse(body).content;
+				if (content) {
+					const newTodo = {
+						content,
+						id: uuidv4()
+					}
+					todos.push(newTodo);
+					handleResponse(res, headers, todos)
 				} else {
-					updateTodoById(res, headers, body, updateIndex);
+					const errMessage = '欄位未填寫正確';
+					handleError(res, headers, 400, errMessage)
 				}
 			} catch (error) {
 				let errMessage = '資料有誤，請洽客服人員';
-				handleError(res, headers, errMessage);
+				handleError(res, headers, 500, errMessage);
+			}
+		})
+	} else if (req.url === '/todos' && req.method === 'DELETE') {
+		// delete todos
+		todos.length = 0;
+		handleResponse(res, headers, todos);
+	} else if (req.url.startsWith('/todos/') && req.method === 'DELETE') {
+		// delete todo by Id
+		const deleteItem = req.url.split('/').pop();
+		const deleteIndex = todos.findIndex(todo => todo.id === deleteItem);
+		if (deleteIndex !== -1) {
+			todos.splice(deleteIndex, 1);
+			handleResponse(res, headers, todos)
+		} else {
+			const errMessage = '查無此 id';
+			handleError(res, headers, 404, errMessage);
+		}
+	} else if (req.url.startsWith('/todos/') && req.method === 'PATCH') {
+		// update todo 
+		req.on('end', () => {
+			try {
+				const updateId = req.url.split('/').pop();
+				const updateIndex = todos.findIndex(todo => todo.id === updateId);
+				const newTodo = JSON.parse(body).content;
+				if (updateIndex === -1) {
+					const errMessage = '查無此id';
+					handleError(res, headers, 404, errMessage);
+				} else if (!newTodo) {
+					const errMessage = '欄位未填寫正確';
+					handleError(res, headers, 400, errMessage)
+
+				} else {
+					todos[updateIndex].content = newTodo;
+					handleResponse(res, headers, todos);
+				}
+			} catch (error) {
+				const errMessage = '伺服器發生錯誤';
+				handleError(res, headers, 500, errMessage);
+
 			}
 		})
 	} else if (req.method === 'OPTIONS') {
 		res.writeHead(200, headers);
 		res.end()
 	} else {
-		let errMessage = 'page not found';
-		handleError(res, headers, errMessage);
+		const errMessage = 'page not found';
+		handleError(res, headers, 404, errMessage);
 	}
 }
 const server = http.createServer(serverRequest);
